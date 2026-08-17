@@ -1,0 +1,49 @@
+# Pipeline Configuration
+# Adjust thresholds, model paths, and region settings here
+
+models:
+  yolop: "models/yolop.onnx"
+  yolov8n_coco: "models/yolov8n.pt"  # General COCO detector (traffic light = class 9)
+  sign_classifier: "models/sign_classifier.pth"
+  sign_detector: "models/sign_detector.pt"
+  traffic_light: "models/traffic_light.pt"  # Optional: dedicated TL model
+
+region: "german"  # "german" or "indian"
+
+# YOLOP settings
+yolop:
+  input_size: [640, 640]
+  conf_threshold: 0.5
+  iou_threshold: 0.45
+
+# Sign detection
+sign_detection:
+  conf_threshold: 0.4
+  classifier_threshold: 0.6  # Minimum confidence to display classification
+
+# Traffic light detection
+traffic_light:
+  conf_threshold: 0.5
+  classes: ["red", "yellow", "green"]
+
+# Display
+hud:
+  show_fps: true
+  show_lanes: true
+  show_drivable_area: true
+  show_vehicles: true
+  show_signs: true
+  show_traffic_lights: true
+  lane_color: [0, 255, 0]        # Green
+  drivable_color: [0, 100, 0]    # Dark green overlay
+  vehicle_box_color: [255, 0, 0] # Blue (BGR)
+  sign_box_color: [0, 255, 255]  # Yellow
+  light_box_color: [0, 0, 255]   # Red
+
+# ADAS Features
+adas:
+  enable_depth: true              # Monocular depth for collision warning
+  depth_model: "small"            # small (fast) / base / large (accurate)
+  fcw_warning_dist: 3.0           # Forward collision warning distance
+  fcw_critical_dist: 1.5          # Emergency brake distance
+  ldw_threshold: 0.3              # Lane departure offset threshold

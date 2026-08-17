@@ -1,0 +1,73 @@
+# ---------------------------------------------------------------
+# CarLaneI — only source, config and docs belong in git.
+# The working tree is ~39 GB; everything below is regenerable or
+# downloadable, so it stays out.
+# ---------------------------------------------------------------
+
+# --- Simulator (18 GB) ---
+CARLA_0.9.15/
+CARLA_*/
+
+# --- Virtual environments (7.6 GB) ---
+.venv/
+.venv*/
+venv/
+env/
+
+# --- Datasets (5 GB + 1.6 GB) ---
+BDDA/
+data/
+*.torrent
+
+# --- Generated output (3 GB) ---
+output/
+runs/
+
+# --- Downloaded videos (2.3 GB) ---
+downloads/
+*.mp4
+*.avi
+*.mov
+*.mkv
+
+# --- Model weights (382 MB) — rebuild via src/export_tensorrt.py ---
+models/
+*.pt
+*.pth
+*.onnx
+*.engine
+*.keras
+*.h5
+*.whl
+
+# --- Archives ---
+*.zip
+*.tar
+*.tar.gz
+*.7z
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.env
+
+# --- Jupyter ---
+.ipynb_checkpoints/
+
+# --- IDE / OS ---
+.vscode/
+.idea/
+.kiro/
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# --- Local machine notes ---
+global_backup_freeze.txt
