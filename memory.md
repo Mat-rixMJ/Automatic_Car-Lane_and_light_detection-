@@ -341,3 +341,107 @@ corridor has little to lock onto. Frankfurt and BDDA100 are good.
 The real ceiling: this is a *model-based corridor refined by segmentation*, not a
 true ego-lane detection. A model trained to output ego-lane boundaries directly
 (CLRNet, UFLD, or YOLOP fine-tuned on ego-lane labels) is the upgrade path.
+
+---
+
+# Session close — state as of 2026-08-17
+
+## Where the project stands
+
+Scope narrowed to **ego-lane + traffic-light detection** (plus vehicles). Sign
+recognition removed from the pipeline. Running at **28-32 FPS at 720p** on the
+RTX 3050 6GB, all six validation gates passing.
+
+Pushed to GitHub: `Mat-rixMJ/Automatic_Car-Lane_and_light_detection-`
+(note the repo name genuinely ends in a hyphen — omitting it gives
+"Repository not found"). Two commits on `main`, 0.27 MB, source + config + docs
+only.
+
+## Active pipeline
+
+```
+YOLOP (TRT, 384)      -> drivable area + lane pixels   25 ms, every 4th frame
+YOLOv8n (TRT, 640)    -> vehicles + traffic lights     25 ms, every 3rd frame
+EgoCorridor (OpenCV)  -> ego lane + LDW offset         part of the 10.7 ms
+TrafficLightTracker   -> gated, temporally-voted R/Y/G  "
+```
+
+Entry point: `src/run_pipeline_fast.py`, or `run.bat` (edit the VIDEO path).
+
+## What is NOT in git, and why
+
+| Excluded | Size | Reason |
+|---|---|---|
+| `CARLA_0.9.15/` | 18 GB | Simulator install, downloadable |
+| `.venv/` | 7.6 GB | Rebuildable from requirements.txt |
+| `BDDA/`, `data/` | 6.6 GB | Datasets, downloadable |
+| `output/`, `runs/` | 3 GB | Generated |
+| `downloads/` | 2.3 GB | Test videos |
+| `models/` | 382 MB | See below |
+
+**TensorRT engines must never be committed.** They are compiled for a specific GPU
+architecture + TensorRT version + driver, so an engine built here fails elsewhere.
+Also `yolov8n.engine` is 166 MB, over GitHub's 100 MB per-file hard limit.
+
+Verified that a fresh clone works: with `models/` empty, Ultralytics auto-downloads
+`yolov8n.pt` to the absolute path it is given, and YOLOP comes via `torch.hub`
+(which clones the repo and loads `weights/End-to-end.pth`, 91.3 MB, cached at
+`~/.cache/torch/hub/hustvl_YOLOP_main/`).
+
+GitHub throttles direct raw download of that 91 MB YOLOP weight file — it returns
+503. The README points at `torch.hub` instead of a raw link. Verified working URL
+for YOLOv8n: `github.com/ultralytics/assets/releases/download/v8.4.0/yolov8n.pt`
+(200, 6.2 MB).
+
+## Two irreplaceable artifacts sitting in models/, NOT committed
+
+These cannot be re-downloaded — only retrained:
+- `sign_classifier.pth` (2.9 MB) — GTSRB CNN, 96.81% official test set
+- `german_sign_detector.pt` (5.9 MB) — YOLOv8n, 99.3% mAP on synthetic data
+
+Combined 8.8 MB, well within GitHub limits. Not needed to run the pipeline since
+sign detection is out of scope. **Decision deferred** — either whitelist these two
+in `.gitignore` or attach to a GitHub Release. Worth doing before the machine is
+ever wiped.
+
+## Next goal
+
+Phase 7 in `goal.md`, full plan in `future.md`: train a **custom traffic-light
+detector** (YOLOv8n fine-tune, 4 classes red/yellow/green/off) on LISA + Bosch.
+This puts a self-trained model in the active pipeline and fixes two documented
+limitations at once — small-light recall, and the colour-opponency heuristic.
+
+Baseline to beat is already measured, so the comparison is ready to run.
+
+Open question flagged in `future.md`: **does the assignment mandate
+TensorFlow/Keras?** This stack is PyTorch throughout. If Keras is required, the
+small traffic-light state classifier is the one component trivial to port.
+
+## Loose ends
+
+- `git config user.name` / `user.email` were never set locally, so the two commits
+  used whatever global values exist. Worth checking attribution.
+- `src/` contains a lot of exploratory and superseded scripts (`pipeline.py`,
+  `run_pipeline.py`, `analyze_output.py`, `validate_all.py`, several one-off
+  diagnostics, plus CARLA and depth-estimation code that is unused). All committed.
+  Cleaning these up would make the repo easier to read for a marker.
+- Two stray weight files sit in `src/` from training runs (`yolov8n.pt`,
+  `yolo26n.pt`, ~11 MB) — gitignored, but they belong in `models/`.
+- CARLA integration (`carla_bridge.py`, `carla_demo.py`, `carla_controller.py`) was
+  built and partially working, then set aside because autopilot quality was poor
+  for demos. Real dashcam footage is used instead.
+
+## Method notes worth carrying forward
+
+The single most valuable habit this session: **convert every complaint into a
+number before touching code.** Nearly every assumption I made without measuring
+turned out wrong —
+
+- assumed the drawing code was the bottleneck; it was 6.5 ms against YOLOP's 67 ms
+- assumed dashed-line fragmentation limited lane fitting; the residual gate did
+- assumed a taller morphological kernel would bridge dashes; it changed nothing
+- assumed lane-line pairing was tunable; it works in 4 frames out of 2800
+- assumed higher ego-pair coverage meant better output; it meant worse
+
+Each of those was caught by measuring, and would have been shipped as a "fix"
+otherwise.
