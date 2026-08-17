@@ -144,6 +144,54 @@ took it from 67 ms to 25 ms.
 
 ---
 
+## Models
+
+Both models in the pipeline are **pretrained** and fetched automatically on first
+run — nothing needs to be downloaded by hand.
+
+| Model | Task | Trained on | Size | Source |
+|---|---|---|---|---|
+| **YOLOP** | Lane lines + drivable area | BDD100K | 91 MB | [hustvl/YOLOP](https://github.com/hustvl/YOLOP) — auto-fetched by `torch.hub` |
+| **YOLOv8n** | Vehicles + traffic lights | COCO | 6.2 MB | [direct download](https://github.com/ultralytics/assets/releases/download/v8.4.0/yolov8n.pt) — auto-fetched by Ultralytics |
+
+`torch.hub` clones the YOLOP repo to `~/.cache/torch/hub/` and loads
+`weights/End-to-end.pth` from it. GitHub throttles direct raw download of that
+91 MB file, so let `torch.hub` handle it rather than fetching it manually.
+
+Only the two segmentation heads of YOLOP are exported; its detection head is
+dropped because YOLOv8 covers objects. Traffic-light *state* is not from a model —
+COCO only reports that a light exists — it is computed in `src/traffic_light.py`.
+
+### Why no `.engine` files in this repo
+
+TensorRT engines are compiled for one specific **GPU architecture + TensorRT
+version + driver**. An engine built here would fail on a different machine, and
+`yolov8n.engine` is 166 MB, over GitHub's 100 MB per-file limit. Build them locally
+instead — it takes a few minutes once:
+
+```bash
+python src/export_yolop_trt.py     # -> models/yolop_384.engine   (61 MB)
+python src/export_tensorrt.py      # -> models/yolov8n.engine    (166 MB)
+```
+
+Without them the pipeline falls back to PyTorch automatically — same output, about
+2.7x slower on YOLOP.
+
+### Optional: sign-recognition weights (not used by the pipeline)
+
+Trained during development and kept for future work. See
+[Traffic signs](#traffic-signs-removed-and-why) for why they are not in the
+pipeline. Not required to run anything.
+
+| File | What | Reproduce with |
+|---|---|---|
+| `sign_classifier.pth` | GTSRB CNN, 43 classes, 96.81% on the official test set | `python src/sign_classifier.py --train` |
+| `german_sign_detector.pt` | YOLOv8n sign detector, 99.3% mAP on synthetic data | `python src/train_combined_detector.py` |
+
+GTSRB data: [official benchmark site](https://benchmark.ini.rub.de/gtsrb_dataset.html).
+
+---
+
 ## Setup
 
 ```bash
@@ -151,16 +199,17 @@ python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
 
-# Build TensorRT engines (one-off, a few minutes each)
-python src/export_yolop_trt.py     # -> models/yolop_384.engine
-python src/export_tensorrt.py      # -> models/yolov8n.engine
+# Optional but recommended — build TensorRT engines for full speed
+python src/export_yolop_trt.py
+python src/export_tensorrt.py
 ```
 
-Requires an NVIDIA GPU with CUDA. Without the `.engine` files the pipeline falls
-back to PyTorch automatically — correct, just slower.
+Requires an NVIDIA GPU with CUDA for TensorRT. Model weights and datasets are
+gitignored; everything needed is fetched or built by the scripts above.
 
-Model weights and datasets are gitignored; the export scripts fetch and build
-what they need.
+Test footage used in the results below: **BDD-A** (dashcam clips) and public
+downtown driving video. `downloads/download.py` fetches YouTube footage at a
+chosen resolution if you want your own test clips.
 
 ---
 
