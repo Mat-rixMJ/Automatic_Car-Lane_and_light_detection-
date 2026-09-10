@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>CarLaneI // Lane, Sign &amp; Signal Perception Bench</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&amp;family=JetBrains+Mono:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: { extend: {
+        colors: {
+          "surface": "#f9f9f7", "surface-container-lowest": "#ffffff",
+          "surface-container-low": "#f4f4f2", "surface-container": "#eeeeec",
+          "surface-container-high": "#e8e8e6", "surface-container-highest": "#e2e3e1",
+          "surface-variant": "#e2e3e1", "outline-variant": "#c5c6ca",
+          "outline": "#75777b", "on-surface-variant": "#44474a",
+          "on-surface": "#1a1c1b", "primary": "#000000", "background": "#f9f9f7",
+          "acc-green": "#2B593F", "acc-amber": "#B45309", "acc-blue": "#1E3A5F",
+          "acc-red": "#C2410C"
+        },
+        fontFamily: {
+          body: ["Hanken Grotesk", "sans-serif"], mono: ["JetBrains Mono", "monospace"]
+        }
+      }}
+    };
+  </script>
+<style>
+    .lab-grid { background-size: 24px 24px;
+      background-image: linear-gradient(to right, rgba(117,119,123,.08) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(117,119,123,.08) 1px, transparent 1px); }
+    .hud-card { box-shadow: 0 1px 3px rgba(25,28,31,.08), inset 0 0 0 1px rgba(25,28,31,.12); }
+    body { font-family: "Hanken Grotesk", sans-serif; }
+    .mono { font-family: "JetBrains Mono", monospace; }
+    .material-symbols-outlined { font-variation-settings: 'wght' 400; }
+
+    /* ---- interactive polish ---- */
+    /* metric / stat / stack cards lift + glow on hover */
+    .i-card { transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; will-change: transform; }
+    .i-card:hover { transform: translateY(-4px); border-color: #2B593F;
+      box-shadow: 0 10px 24px -8px rgba(43,89,63,.35), inset 0 0 0 1px rgba(43,89,63,.4); }
+    /* accent bar that grows on hover (top of a card) */
+    .i-accent { position: relative; overflow: hidden; }
+    .i-accent::before { content:""; position:absolute; top:0; left:0; height:3px; width:0;
+      background:#2B593F; transition:width .25s ease; }
+    .i-accent:hover::before { width:100%; }
+    .i-accent.amber::before { background:#B45309; }
+    .i-accent.blue::before { background:#1E3A5F; }
+    .i-accent.red::before { background:#C2410C; }
+    /* big number pulse on hover */
+    .i-card:hover .i-num { letter-spacing:-.5px; }
+    .i-num { transition: letter-spacing .18s ease, color .18s ease; }
+    /* table rows highlight + slide */
+    tbody tr { transition: background .15s ease, transform .15s ease; }
+    tbody tr:hover { background:#eef3ef; transform: translateX(3px); }
+    /* sample buttons + generic buttons */
+    .i-btn { transition: transform .15s ease, box-shadow .15s ease, background .15s ease, border-color .15s ease; }
+    .i-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 16px -6px rgba(25,28,31,.4); }
+    .i-btn:active { transform: translateY(0); }
+    /* nav links underline grow */
+    .i-nav { position:relative; }
+    .i-nav::after { content:""; position:absolute; left:0; bottom:-4px; height:2px; width:0;
+      background:#000; transition:width .2s ease; }
+    .i-nav:hover::after { width:100%; }
+    /* dropzone reacts */
+    .i-drop { transition: border-color .2s ease, background .2s ease, transform .2s ease; }
+    .i-drop:hover, .i-drop.drag { border-color:#2B593F; background:#f1f5f2; }
+    .i-drop.drag { transform: scale(1.01); }
+    /* viewport frame subtle glow on hover */
+    .i-view { transition: box-shadow .2s ease; }
+    .i-view:hover { box-shadow: 0 0 0 3px rgba(43,89,63,.25), 0 12px 30px -10px rgba(25,28,31,.5); }
+    /* pulsing status/live dot */
+    @keyframes pulse-dot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.7)} }
+    .live-dot { animation: pulse-dot 1.4s ease-in-out infinite; }
+    /* fade-up on scroll reveal */
+    .reveal { opacity:0; transform: translateY(16px); transition: opacity .5s ease, transform .5s ease; }
+    .reveal.in { opacity:1; transform:none; }
+    /* icon tiles spin/scale a touch */
+    .i-icon { transition: transform .25s ease, background .2s ease, color .2s ease; }
+    .i-card:hover .i-icon { transform: rotate(-6deg) scale(1.08); background:#2B593F; color:#fff; }
+
+    /* timeline segments */
+    .tl-seg { position:absolute; top:0; bottom:0; }
+    .tl-cursor { position:absolute; top:-2px; bottom:-2px; width:2px; background:#000;
+      box-shadow:0 0 0 1px #fff; pointer-events:none; transition: left .08s linear; }
+    .tl-ldw { position:absolute; top:0; bottom:0; width:3px; background:#C2410C; }
+
+    /* toasts */
+    #toasts { position:fixed; top:70px; right:20px; z-index:100; display:flex;
+      flex-direction:column; gap:8px; max-width:340px; }
+    .toast { display:flex; align-items:center; gap:10px; padding:10px 14px;
+      background:#fff; border-left:4px solid #C2410C; box-shadow:0 8px 24px -6px rgba(25,28,31,.35);
+      font-family:"JetBrains Mono",monospace; font-size:12px; color:#1a1c1b;
+      transform:translateX(120%); opacity:0; transition:transform .3s ease, opacity .3s ease; }
+    .toast.show { transform:translateX(0); opacity:1; }
+    .toast.red { border-left-color:#C2410C; }
+    .toast.amber { border-left-color:#B45309; }
+    .toast .material-symbols-outlined { font-size:20px; }
+  </style>
+</head>
+<body class="bg-background text-on-surface antialiased min-h-screen flex flex-col">
+<!-- HEADER -->
+<header class="bg-surface-container-lowest border-b border-surface-variant sticky top-0 z-50">
+<div class="border-b border-surface-variant/60 bg-surface-container-low px-6 py-1 text-[11px] mono text-on-surface-variant flex items-center justify-between">
+<div class="flex items-center gap-4">
+<span id="status-pill" class="flex items-center gap-1.5 font-semibold text-on-surface">
+<span id="status-dot" class="w-2 h-2 rounded-full bg-outline"></span>
+<span id="status-text">CONNECTING TO BENCH…</span>
+</span>
+<span class="hidden md:inline text-outline-variant">|</span>
+<span class="hidden md:inline">TRAINED ON: BDD100K + GTSDB + INDIAN + BOSCH (REAL DATASETS)</span>
+</div>
+<div class="flex items-center gap-4">
+<span id="gpu-text">GPU: —</span>
+<span class="text-outline-variant">|</span>
+<span id="models-text" class="text-acc-green font-bold">MODELS: —</span>
+</div>
+</div>
+<div class="flex justify-between items-center w-full px-6 py-3.5 max-w-7xl mx-auto">
+<div class="flex items-center gap-3">
+<div class="w-9 h-9 border border-primary bg-primary text-white flex items-center justify-center mono font-bold text-sm">CL</div>
+<div class="flex flex-col">
+<span class="text-[16px] text-primary font-bold uppercase tracking-wider leading-none">CarLaneI Perception Bench</span>
+<span class="mono text-[11px] text-on-surface-variant tracking-wider mt-0.5 uppercase">Ego-Lane · Traffic Sign · Signal State — measured, not simulated</span>
+</div>
+</div>
+<nav class="hidden lg:flex items-center gap-5 mono text-[12px]">
+<a class="text-primary font-semibold border-b-2 border-primary pb-1" href="#workbench">Demo</a>
+<a class="text-on-surface-variant hover:text-primary" href="#how">How it works</a>
+<a class="text-on-surface-variant hover:text-primary" href="#stack">Models</a>
+<a class="text-on-surface-variant hover:text-primary" href="#data">Datasets</a>
+<a class="text-on-surface-variant hover:text-primary" href="#decisions">Why these choices</a>
+<a class="text-on-surface-variant hover:text-primary" href="#sota">Benchmarks</a>
+<a class="text-on-surface-variant hover:text-primary" href="#perf">Performance</a>
+<a class="text-on-surface-variant hover:text-primary" href="#next">Roadmap</a>
+</nav>
+</div>
+</header>
+
+<!-- HERO + METRIC STRIP (real measured numbers) -->
+<section class="border-b border-surface-variant bg-surface lab-grid pt-10 pb-12 px-6">
+<div class="max-w-7xl mx-auto w-full">
+<div class="flex items-center gap-2 mono text-[11px] text-acc-green font-bold tracking-widest uppercase mb-3">
+<span class="inline-block w-2.5 h-2.5 bg-acc-green"></span>
+        CARLANEI // REAL-TIME EGO-LANE, SIGN &amp; SIGNAL PERCEPTION
+      </div>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-end">
+<div class="lg:col-span-8">
+<h1 class="text-[44px] leading-[1.05] text-primary tracking-tight font-bold">Real-Time Driving Perception, Retrained for Indian Roads</h1>
+<p class="mt-4 text-on-surface-variant text-[16px] max-w-3xl leading-relaxed">
+            Four perception tasks — ego-lane, traffic signs, traffic-light state, and vehicles — running live in <b>~23 FPS on 720p</b> on a single laptop <b>RTX 3050 (6 GB)</b>, all five models compiled to <b>TensorRT FP16</b>. Three of the five we trained ourselves on real data (BDD100K, GTSDB + Indian dashcam, Bosch). This page is both the working demo <em>and</em> the deck — every number is measured, not simulated. Scroll for the how-it-works, the models, and the design decisions.
+          </p>
+</div>
+<div class="lg:col-span-4 bg-surface-container-lowest border border-outline-variant p-4 shadow-sm">
+<div class="flex items-center justify-between border-b border-surface-variant pb-2 mb-3">
+<span class="mono text-[12px] font-bold text-primary">HELD-OUT MODEL METRICS</span>
+<span class="mono text-[11px] text-outline">MEASURED</span>
+</div>
+<div class="space-y-2 mono text-[12px]">
+<div class="flex justify-between py-1 border-b border-surface-variant/40"><span class="text-on-surface-variant">Ego-lane mask mAP50</span><span class="font-semibold text-acc-green">0.972</span></div>
+<div class="flex justify-between py-1 border-b border-surface-variant/40"><span class="text-on-surface-variant">Sign detector mAP50</span><span class="font-semibold text-acc-green">~0.91</span></div>
+<div class="flex justify-between py-1 border-b border-surface-variant/40"><span class="text-on-surface-variant">Light-state mAP50 (Bosch)</span><span class="font-semibold text-acc-amber">~0.58</span></div>
+<div class="flex justify-between py-1"><span class="text-on-surface-variant">Lane vs old heuristic (IoU)</span><span class="font-semibold text-primary">0.59 vs 0.06</span></div>
+</div>
+</div>
+</div>
+<div class="mt-8 grid grid-cols-2 md:grid-cols-4 gap-0 border border-outline-variant bg-surface-container-lowest">
+<div class="p-4 border-r border-b md:border-b-0 border-outline-variant">
+<div class="text-[10px] text-outline uppercase tracking-wider mb-1 font-bold">EGO-LANE MASK mAP50</div>
+<div class="mono text-[26px] font-bold text-primary tracking-tight">0.972</div>
+<div class="mono text-[11px] text-on-surface-variant mt-1">YOLOv8n-seg · BDD100K held-out</div>
+</div>
+<div class="p-4 border-r-0 md:border-r border-b md:border-b-0 border-outline-variant">
+<div class="text-[10px] text-outline uppercase tracking-wider mb-1 font-bold">SIGN DETECTOR mAP50</div>
+<div class="mono text-[26px] font-bold text-acc-blue tracking-tight">~0.91</div>
+<div class="mono text-[11px] text-on-surface-variant mt-1">GTSDB + Indian · 4 classes</div>
+</div>
+<div class="p-4 border-r border-outline-variant">
+<div class="text-[10px] text-outline uppercase tracking-wider mb-1 font-bold">THROUGHPUT (720p)</div>
+<div class="mono text-[26px] font-bold text-primary tracking-tight">~23 FPS</div>
+<div class="mono text-[11px] text-on-surface-variant mt-1">RTX 3050 6GB · TensorRT FP16 · 5 models</div>
+</div>
+<div class="p-4">
+<div class="text-[10px] text-outline uppercase tracking-wider mb-1 font-bold">LANE IoU GAIN</div>
+<div class="mono text-[26px] font-bold text-acc-amber tracking-tight">+0.53</div>
+<div class="mono text-[11px] text-on-surface-variant mt-1">learned seg vs heuristic corridor</div>
+</div>
+</div>
+</div>
+</section>
+
+<!-- WORKBENCH -->
+<section class="py-10 px-6 max-w-7xl mx-auto w-full" id="workbench">
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-3 pb-4 border-b border-primary/20 mb-6">
+<div>
+<div class="mono text-[11px] text-outline uppercase tracking-widest font-semibold">SEC. 01 // INGESTION &amp; OPTICAL BENCH</div>
+<h2 class="text-[26px] text-primary tracking-tight mt-0.5 font-semibold">Run the Pipeline on a Clip</h2>
+</div>
+<div id="run-badge" class="flex items-center gap-2 mono text-[11px]">
+<span class="px-2.5 py-1 bg-surface-container border border-outline-variant text-on-surface font-semibold">IDLE</span>
+</div>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+<!-- LEFT: ingestion -->
+<div class="lg:col-span-5 flex flex-col gap-5">
+<div class="border-2 border-dashed border-outline-variant bg-surface-container-lowest p-6 flex flex-col items-center text-center">
+<div class="w-12 h-12 border border-outline-variant bg-surface-container-low flex items-center justify-center text-primary mb-3">
+<span class="material-symbols-outlined text-[24px]">upload_file</span>
+</div>
+<h3 class="text-[18px] text-primary font-semibold">Upload Dashcam Footage</h3>
+<p class="text-on-surface-variant text-[13px] mt-1 max-w-xs">MP4 / MOV / MKV. By default the <span id="cap-seconds" class="font-semibold">full</span> video is processed — enable the limit below for a quick preview.</p>
+<div class="mt-4 flex flex-wrap justify-center items-center gap-2">
+<label class="cursor-pointer inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-primary text-white mono text-[12px] hover:bg-on-surface-variant">
+<span class="material-symbols-outlined text-[15px]">folder_open</span> Browse Media
+              <input id="file-input" accept="video/*,.mp4,.mov,.m4v,.mkv,.avi,.webm" class="hidden" type="file"/>
+</label>
+<span class="mono text-[11px] text-outline">or pick a sample →</span>
+</div>
+<div class="mt-3 flex flex-col gap-1.5 mono text-[11px]">
+<label class="inline-flex items-center gap-2 cursor-pointer">
+<input id="limit-toggle" type="checkbox" class="accent-primary w-3.5 h-3.5"/>
+<span class="text-on-surface-variant">Limit clip length <span class="text-outline">(off = process full video)</span></span>
+</label>
+<div id="clip-len-row" class="flex items-center gap-2 opacity-40 pointer-events-none pl-5">
+<label class="text-on-surface-variant">Length:</label>
+<input id="sec-range" type="range" min="4" max="60" value="30" class="w-32 accent-primary"/>
+<span id="sec-val" class="font-bold text-primary">30s</span>
+</div>
+</div>
+<div class="mt-3 flex items-center gap-2 mono text-[11px]">
+<label class="text-on-surface-variant" for="lane-model">Lane model:</label>
+<select id="lane-model" class="bg-surface border border-outline-variant text-on-surface px-2 py-1 mono text-[11px]">
+<option value="auto">Auto (BDD default)</option>
+<option value="ego_seg">BDD ego-seg (mAP50 0.97)</option>
+<option value="ego_seg_idd">IDD Indian (A/B, weak)</option>
+</select>
+</div>
+<div class="mt-3 flex items-center gap-2 mono text-[11px]">
+<label class="text-on-surface-variant">View:</label>
+<button id="view-final" type="button" class="px-3 py-1 font-semibold bg-primary text-white">Final render</button>
+<button id="view-live" type="button" class="px-3 py-1 font-semibold bg-surface text-on-surface-variant border border-outline-variant">Live preview</button>
+</div>
+<p class="mt-1.5 mono text-[10px] text-outline max-w-xs" id="view-hint">Final render: full-quality annotated video, download-ready. Live preview: watch frames as they process.</p>
+</div>
+<!-- SAMPLES -->
+<div class="bg-surface-container-lowest border border-outline-variant p-4">
+<div class="flex items-center justify-between pb-2 mb-3 border-b border-surface-variant">
+<span class="text-[11px] text-primary uppercase font-bold flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[15px]">library_books</span> Sample Clips</span>
+<span class="mono text-[10px] text-outline">BDD-A / Munich / NYC</span>
+</div>
+<div id="samples" class="grid grid-cols-2 gap-2.5 mono text-[12px]"></div>
+</div>
+<!-- LIVE (LONG) full-length clips -->
+<div class="bg-surface-container-lowest border border-outline-variant p-4">
+<div class="flex items-center justify-between pb-2 mb-3 border-b border-surface-variant">
+<span class="text-[11px] text-primary uppercase font-bold flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[15px]">sensors</span> Live (Long) — Full Videos</span>
+<span class="mono text-[10px] text-outline">streamed, not saved</span>
+</div>
+<p class="mono text-[10px] text-outline mb-2.5">Full-length Indian drives (25-75 min). Streams live; nothing is written to disk. Press stop or leave the page to end.</p>
+<div id="samples-full" class="grid grid-cols-1 gap-2.5 mono text-[12px]"></div>
+</div>
+<!-- RUN CONTROL -->
+<button id="run-btn" disabled class="inline-flex items-center justify-center gap-2 px-4 py-3 bg-primary text-white mono text-[13px] font-semibold hover:bg-on-surface-variant disabled:opacity-40 disabled:cursor-not-allowed">
+<span class="material-symbols-outlined text-[18px]">play_arrow</span>
+<span id="run-label">Select a clip to run</span>
+</button>
+<button id="stop-btn" class="hidden inline-flex items-center justify-center gap-2 px-4 py-3 bg-acc-red text-white mono text-[13px] font-semibold hover:opacity-90">
+<span class="material-symbols-outlined text-[18px]">stop</span>
+<span>Stop</span>
+</button>
+<div id="progress-wrap" class="hidden">
+<div class="flex justify-between mono text-[11px] mb-1">
+<span class="text-on-surface-variant" id="progress-label">Processing…</span>
+<span class="font-bold text-primary" id="progress-pct">0%</span>
+</div>
+<div class="w-full h-2 bg-surface-variant"><div id="progress-bar" class="h-full bg-acc-green" style="width:0%"></div></div>
+</div>
+</div>
+<!-- RIGHT: viewport -->
+<div class="lg:col-span-7 flex flex-col gap-3">
+<div class="relative w-full aspect-video border-2 border-primary bg-black overflow-hidden shadow-sm">
+<video id="result-video" class="w-full h-full object-contain bg-black" controls playsinline></video>
+<img id="live-view" class="hidden absolute inset-0 w-full h-full object-contain bg-black" alt="live preview"/>
+<div id="live-badge" class="hidden absolute top-2 right-2 z-10 mono text-[11px] font-bold px-2.5 py-1 bg-acc-red text-white flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-white live-dot"></span>LIVE</div>
+<div id="video-placeholder" class="absolute inset-0 flex flex-col items-center justify-center text-outline-variant bg-surface-container-lowest">
+<span class="material-symbols-outlined text-[48px]">movie</span>
+<p class="mono text-[12px] mt-2">Annotated output appears here after a run</p>
+</div>
+<!-- live HUD driven by telemetry frames -->
+<div id="hud" class="hidden absolute top-2 left-2 right-2 flex items-start justify-between mono text-[11px] pointer-events-none">
+<div class="bg-surface-container-lowest/90 px-2.5 py-1 border border-outline-variant flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-acc-green"></span>
+<span class="font-bold">FPS <span id="hud-fps">—</span></span>
+<span class="text-outline">|</span>
+<span>t=<span id="hud-t">0.0</span>s</span>
+</div>
+<div id="hud-ldw" class="bg-surface-container-lowest/90 px-2.5 py-1 border border-outline-variant"><span class="text-on-surface-variant">LANE: </span><span id="hud-lane" class="font-bold text-acc-green">—</span></div>
+<div class="bg-surface-container-lowest/90 px-2.5 py-1 border border-outline-variant">cars <b id="hud-cars">0</b> · lights <b id="hud-lights">0</b> · signs <b id="hud-signs">0</b></div>
+</div>
+<div id="hud-signal" class="hidden absolute bottom-2 right-2 mono text-[13px] font-bold px-3 py-1 border">SIGNAL</div>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant px-3 py-2 flex items-center justify-between text-on-surface-variant mono text-[11px]">
+<div class="flex items-center gap-3">
+<span>SOURCE FPS: <b id="stat-fps" class="text-primary">—</b></span><span>•</span>
+<span>PROC FPS: <b id="stat-proc" class="text-acc-green">—</b></span><span>•</span>
+<span>RES: <b id="stat-res" class="text-primary">—</b></span>
+</div>
+<a id="dl-link" class="text-primary hover:underline font-semibold hidden items-center gap-1" download>
+<span class="material-symbols-outlined text-[13px]">file_download</span> Download annotated MP4</a>
+</div>
+<!-- SIGNAL + LDW TIMELINE (click to seek) -->
+<div id="timeline-wrap" class="hidden bg-surface-container-lowest border border-outline-variant px-3 py-2">
+<div class="flex items-center justify-between mono text-[10px] text-outline uppercase tracking-wider mb-1.5">
+<span>Event timeline — signal state &amp; lane alerts</span>
+<span class="flex items-center gap-3">
+<span class="flex items-center gap-1"><span class="w-2 h-2" style="background:#2B593F"></span>green</span>
+<span class="flex items-center gap-1"><span class="w-2 h-2" style="background:#B45309"></span>yellow</span>
+<span class="flex items-center gap-1"><span class="w-2 h-2" style="background:#C2410C"></span>red</span>
+<span class="flex items-center gap-1"><span class="w-2 h-2 bg-outline-variant"></span>none</span>
+</span>
+</div>
+<div id="timeline" class="relative w-full h-6 bg-surface-variant cursor-pointer overflow-hidden" title="click to seek"></div>
+<div id="timeline-ldw" class="relative w-full h-3 mt-0.5" title="lane departure events"></div>
+</div>
+<!-- CHARTS: lane offset + mean confidence over time -->
+<div id="charts-wrap" class="hidden grid grid-cols-1 md:grid-cols-2 gap-3">
+<div class="bg-surface-container-lowest border border-outline-variant p-3">
+<div class="flex items-center justify-between mono text-[10px] text-outline uppercase tracking-wider mb-1">
+<span>Ego lane offset</span><span id="chart-offset-val" class="text-primary font-bold">—</span>
+</div>
+<svg id="chart-offset" viewBox="0 0 300 60" preserveAspectRatio="none" class="w-full h-[60px]"></svg>
+<div class="mono text-[9px] text-outline mt-0.5">left ‹ centre › right · dashed = lane-departure threshold</div>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant p-3">
+<div class="flex items-center justify-between mono text-[10px] text-outline uppercase tracking-wider mb-1">
+<span>Mean detection confidence</span><span id="chart-conf-val" class="text-acc-green font-bold">—</span>
+</div>
+<svg id="chart-conf" viewBox="0 0 300 60" preserveAspectRatio="none" class="w-full h-[60px]"></svg>
+<div class="mono text-[9px] text-outline mt-0.5">avg confidence of all detections per frame (0–1)</div>
+</div>
+</div>
+<!-- BEFORE / AFTER LANE TOGGLE -->
+<div id="ba-wrap" class="hidden bg-surface-container-lowest border border-outline-variant px-3 py-2.5">
+<div class="flex items-center justify-between flex-wrap gap-2">
+<div class="flex items-center gap-2">
+<span class="mono text-[11px] text-primary font-bold uppercase">Lane method</span>
+<div class="inline-flex border border-outline-variant overflow-hidden">
+<button id="ba-egoseg" class="i-btn px-3 py-1 mono text-[11px] font-semibold bg-primary text-white">Learned ego-seg</button>
+<button id="ba-corridor" class="i-btn px-3 py-1 mono text-[11px] font-semibold bg-surface text-on-surface-variant">Heuristic corridor</button>
+</div>
+</div>
+<div class="mono text-[11px] text-on-surface-variant">
+<span id="ba-note">Learned model — mask mAP50 0.959, IoU 0.59 vs 0.06</span>
+<span id="ba-status" class="ml-2 text-acc-amber"></span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+
+<!-- DETECTION LOGS -->
+<!-- HOW IT WORKS (presentation) -->
+<section class="py-10 px-6 max-w-7xl mx-auto w-full border-t border-surface-variant" id="how">
+<div class="pb-4 border-b border-primary/20 mb-6">
+<div class="mono text-[11px] text-outline uppercase tracking-widest font-semibold">SEC. 02 // HOW IT WORKS</div>
+<h2 class="text-[26px] text-primary tracking-tight mt-0.5 font-semibold">One Frame, Five Networks, Two Fusers</h2>
+<p class="text-on-surface-variant text-[14px] mt-1 max-w-3xl">Each dashcam frame fans out to five nano-scale networks running concurrently in 6 GB. Two classical-CV fusers turn raw detections into stable, usable output. Frame-skipping (heavy models every 3rd–6th frame, cached between) is what buys the frame rate.</p>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+<!-- pipeline flow -->
+<div class="lg:col-span-2 bg-surface-container-lowest border border-outline-variant p-5">
+<div class="mono text-[11px] text-outline uppercase tracking-wider font-bold mb-3">PIPELINE</div>
+<div class="grid grid-cols-1 sm:grid-cols-5 gap-2 mono text-[11px]">
+<div class="p-2.5 border border-outline-variant bg-surface text-center"><div class="font-bold text-acc-green">ego_seg</div><div class="text-outline text-[10px] mt-1">ego-lane mask</div></div>
+<div class="p-2.5 border border-outline-variant bg-surface text-center"><div class="font-bold text-primary">YOLOP</div><div class="text-outline text-[10px] mt-1">drivable + lane px</div></div>
+<div class="p-2.5 border border-outline-variant bg-surface text-center"><div class="font-bold text-acc-blue">YOLOv8n</div><div class="text-outline text-[10px] mt-1">vehicles + light box</div></div>
+<div class="p-2.5 border border-outline-variant bg-surface text-center"><div class="font-bold text-acc-red">light_state</div><div class="text-outline text-[10px] mt-1">R/Y/G/OFF</div></div>
+<div class="p-2.5 border border-outline-variant bg-surface text-center"><div class="font-bold text-acc-amber">signs</div><div class="text-outline text-[10px] mt-1">4 super-classes</div></div>
+</div>
+<div class="text-center text-outline mono text-[16px] my-2">↓ fuse ↓</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mono text-[11px]">
+<div class="p-2.5 border border-outline-variant bg-surface-container-low"><div class="font-bold text-primary">EgoLane smoothing</div><div class="text-outline text-[10px] mt-1">temporal EMA → lane-centre offset → LDW alert</div></div>
+<div class="p-2.5 border border-outline-variant bg-surface-container-low"><div class="font-bold text-primary">TrafficLightTracker</div><div class="text-outline text-[10px] mt-1">geometry gate + temporal state voting → stable R/Y/G</div></div>
+</div>
+<div class="text-center text-outline mono text-[16px] my-2">↓</div>
+<div class="p-2.5 border border-primary bg-surface text-center mono text-[11px] font-bold text-primary">Annotated frame + LDW + per-frame telemetry</div>
+</div>
+<!-- cadence + why classical CV -->
+<div class="flex flex-col gap-4">
+<div class="bg-surface-container-lowest border border-outline-variant p-5">
+<div class="mono text-[11px] text-outline uppercase tracking-wider font-bold mb-3">FRAME-SKIP CADENCE</div>
+<div class="mono text-[12px] space-y-2">
+<div class="flex justify-between border-b border-surface-variant/40 pb-1"><span class="text-on-surface-variant">Default (accurate)</span><span class="font-bold text-primary">16 FPS</span></div>
+<div class="flex justify-between"><span class="text-on-surface-variant">Fast (live/long)</span><span class="font-bold text-acc-green">23 FPS</span></div>
+</div>
+<p class="text-[11px] text-on-surface-variant mt-3 leading-relaxed">Heavy models run every 3rd–6th frame; detections cached between. Road & signals change slowly vs 30 FPS, so overlays stay continuous.</p>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant p-5">
+<div class="mono text-[11px] text-outline uppercase tracking-wider font-bold mb-3">TRAFFIC-LIGHT TRACKER</div>
+<div class="mono text-[12px] space-y-2">
+<div class="flex justify-between border-b border-surface-variant/40 pb-1"><span class="text-on-surface-variant">Sub-horizon FPs</span><span class="font-bold">53% → <span class="text-acc-green">0%</span></span></div>
+<div class="flex justify-between"><span class="text-on-surface-variant">State flip rate</span><span class="font-bold">11% → <span class="text-acc-green">1%</span></span></div>
+</div>
+<p class="text-[11px] text-on-surface-variant mt-3 leading-relaxed">Classical CV that earns its place: geometry gate + temporal voting clean up raw detections without a model.</p>
+</div>
+</div>
+</div>
+</section>
+
+<!-- DETECTION LOGS -->
+<section class="py-10 px-6 max-w-7xl mx-auto w-full border-t border-surface-variant" id="logs">
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-3 pb-4 border-b border-primary/20 mb-6">
+<div>
+<div class="mono text-[11px] text-outline uppercase tracking-widest font-semibold">SEC. 03 // LIVE RESULTS - DETECTION REGISTRY</div>
+<h2 class="text-[26px] text-primary tracking-tight mt-0.5 font-semibold">What the Models Actually Detected</h2>
+</div>
+<span class="mono text-[11px] text-on-surface-variant">Populated from the processed run — not pre-filled.</span>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+<!-- signs -->
+<div class="bg-surface-container-lowest border border-outline-variant shadow-sm flex flex-col">
+<div class="p-4 border-b border-surface-variant bg-surface-container-low flex items-center justify-between">
+<div class="flex items-center gap-2"><span class="w-3 h-3 bg-acc-amber inline-block"></span>
+<span class="text-[18px] text-primary font-semibold">Traffic Sign Detections</span></div>
+<span class="mono text-[10px] text-outline">GTSDB 4-CLASS</span>
+</div>
+<div class="overflow-x-auto"><table class="w-full text-left text-[12px] mono">
+<thead class="bg-surface border-b border-surface-variant text-outline uppercase text-[10px] tracking-wider">
+<tr><th class="p-3">Class</th><th class="p-3">Detections</th><th class="p-3">Mean conf</th><th class="p-3 text-right">Share</th></tr></thead>
+<tbody id="sign-tbody" class="divide-y divide-surface-variant">
+<tr><td class="p-3 text-outline" colspan="4">Run a clip to populate…</td></tr>
+</tbody></table></div>
+</div>
+<!-- lights -->
+<div class="bg-surface-container-lowest border border-outline-variant shadow-sm flex flex-col">
+<div class="p-4 border-b border-surface-variant bg-surface-container-low flex items-center justify-between">
+<div class="flex items-center gap-2"><span class="w-3 h-3 bg-acc-green inline-block"></span>
+<span class="text-[18px] text-primary font-semibold">Traffic Signal States</span></div>
+<span class="mono text-[10px] text-outline">COLOUR + TEMPORAL VOTE</span>
+</div>
+<div class="overflow-x-auto"><table class="w-full text-left text-[12px] mono">
+<thead class="bg-surface border-b border-surface-variant text-outline uppercase text-[10px] tracking-wider">
+<tr><th class="p-3">State</th><th class="p-3">Frame-detections</th><th class="p-3">Mean conf</th><th class="p-3 text-right">Share</th></tr></thead>
+<tbody id="light-tbody" class="divide-y divide-surface-variant">
+<tr><td class="p-3 text-outline" colspan="4">Run a clip to populate…</td></tr>
+</tbody></table></div>
+</div>
+</div>
+</section>
+
+<!-- RUN METRICS -->
+<section class="py-10 px-6 max-w-7xl mx-auto w-full border-t border-surface-variant" id="metrics">
+<div class="pb-4 border-b border-primary/20 mb-6">
+<div class="mono text-[11px] text-outline uppercase tracking-widest font-semibold">SEC. 04 // RUN METRICS</div>
+<h2 class="text-[26px] text-primary tracking-tight mt-0.5 font-semibold">Measured This Run</h2>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+<div class="p-4 bg-surface-container-lowest border border-outline-variant">
+<div class="text-[10px] text-outline uppercase tracking-wider font-bold">EGO-LANE PRESENT</div>
+<div class="mono text-[26px] font-bold text-acc-green my-2" id="m-lane">—</div>
+<div class="mono text-[11px] text-on-surface-variant">% of frames with a lane fix</div>
+</div>
+<div class="p-4 bg-surface-container-lowest border border-outline-variant">
+<div class="text-[10px] text-outline uppercase tracking-wider font-bold">MEAN LANE OFFSET</div>
+<div class="mono text-[26px] font-bold text-acc-blue my-2" id="m-offset">—</div>
+<div class="mono text-[11px] text-on-surface-variant">|ego offset| ratio, 0 = centred</div>
+</div>
+<div class="p-4 bg-surface-container-lowest border border-outline-variant">
+<div class="text-[10px] text-outline uppercase tracking-wider font-bold">VEHICLES / FRAME</div>
+<div class="mono text-[26px] font-bold text-primary my-2" id="m-veh">—</div>
+<div class="mono text-[11px] text-on-surface-variant">mean vehicle detections</div>
+</div>
+<div class="p-4 bg-surface-container-lowest border border-outline-variant">
+<div class="text-[10px] text-outline uppercase tracking-wider font-bold">PROCESSING FPS</div>
+<div class="mono text-[26px] font-bold text-acc-amber my-2" id="m-fps">—</div>
+<div class="mono text-[11px] text-on-surface-variant">RTX 3050 · TensorRT FP16</div>
+</div>
+</div>
+</section>
+
+<!-- SOTA CONTEXT -->
+<section class="py-10 px-6 max-w-7xl mx-auto w-full border-t border-surface-variant" id="sota">
+<div class="pb-4 border-b border-primary/20 mb-6">
+<div class="mono text-[11px] text-outline uppercase tracking-widest font-semibold">SEC. 05 // CONTEXT vs PUBLISHED WORK</div>
+<h2 class="text-[26px] text-primary tracking-tight mt-0.5 font-semibold">How the Numbers Compare</h2>
+<p class="text-on-surface-variant text-[14px] mt-1 max-w-3xl">CarLaneI's measured results next to published baselines on the same public benchmarks. Different splits/protocols, so read as context, not a leaderboard.</p>
+</div>
+<div class="overflow-x-auto bg-surface-container-lowest border border-outline-variant shadow-sm">
+<table class="w-full text-left text-[12px] mono">
+<thead class="bg-surface-container-low border-b border-surface-variant text-outline uppercase text-[10px] tracking-wider">
+<tr><th class="p-3">Task</th><th class="p-3">Method</th><th class="p-3">Dataset</th><th class="p-3">Metric</th><th class="p-3 text-right">Score</th></tr>
+</thead>
+<tbody class="divide-y divide-surface-variant">
+<tr class="bg-acc-green/5"><td class="p-3 font-semibold">Ego-lane</td><td class="p-3 text-acc-green font-bold">CarLaneI (ours)</td><td class="p-3">BDD100K drivable</td><td class="p-3">mask mAP50</td><td class="p-3 text-right font-bold text-acc-green">0.972</td></tr>
+<tr><td class="p-3">Lane+drivable</td><td class="p-3">YOLOP</td><td class="p-3">BDD100K</td><td class="p-3">lane IoU / DA mIoU</td><td class="p-3 text-right">0.70 / 0.91*</td></tr>
+<tr><td class="p-3">Multi-task</td><td class="p-3">Q-YOLOP</td><td class="p-3">BDD100K</td><td class="p-3">seg mIoU</td><td class="p-3 text-right">0.612*</td></tr>
+<tr><td class="p-3">Multi-task</td><td class="p-3">TriLiteNet</td><td class="p-3">BDD100K</td><td class="p-3">drivable mIoU</td><td class="p-3 text-right">0.924*</td></tr>
+<tr class="bg-acc-amber/5"><td class="p-3 font-semibold">Traffic signs</td><td class="p-3 text-acc-amber font-bold">CarLaneI (ours)</td><td class="p-3">GTSDB + Indian (4-class)</td><td class="p-3">mAP50</td><td class="p-3 text-right font-bold text-acc-amber">~0.91</td></tr>
+<tr><td class="p-3">Sign detection</td><td class="p-3">FSADD</td><td class="p-3">GTSDB (29-class)</td><td class="p-3">cls accuracy</td><td class="p-3 text-right">0.739*</td></tr>
+<tr class="bg-acc-red/5"><td class="p-3 font-semibold">Light state</td><td class="p-3 text-acc-red font-bold">CarLaneI (ours)</td><td class="p-3">Bosch (R/Y/G/OFF)</td><td class="p-3">mAP50</td><td class="p-3 text-right font-bold text-acc-red">~0.58</td></tr>
+<tr class="bg-acc-blue/5"><td class="p-3 font-semibold">Lane upgrade</td><td class="p-3 text-acc-blue font-bold">CarLaneI ego-seg vs heuristic</td><td class="p-3">BDD100K held-out</td><td class="p-3">ego IoU</td><td class="p-3 text-right font-bold text-acc-blue">0.59 vs 0.06</td></tr>
+</tbody>
+</table>
+</div>
+<p class="mono text-[10px] text-outline mt-2">* published figures from the respective papers (YOLOP MIR 2022; Q-YOLOP arXiv 2307.04537; TriLiteNet arXiv 2509.04092; FSADD MDPI Electronics 12/3/725). Metrics differ in definition/split — see docs/01_field_research.md. Our figures are measured on held-out data.</p>
+<!-- DAY vs NIGHT (measured hard case) -->
+<div class="mt-8">
+<div class="flex items-center gap-2 mb-3">
+<span class="material-symbols-outlined text-[20px] text-acc-blue">nightlight</span>
+<h3 class="text-[18px] text-primary font-semibold">Day vs Night — the hard case, measured</h3>
+</div>
+<p class="text-on-surface-variant text-[13px] mb-4 max-w-3xl">Night/low-light is the field's known failure mode. We measured it on our own footage (night = brightness &lt;70, day = &gt;110). Stated plainly, not hidden.</p>
+<div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+<div class="i-card i-accent p-4 border border-outline-variant bg-surface-container-lowest cursor-default">
+<div class="text-[10px] text-outline uppercase tracking-wider mb-1 font-bold">EGO-LANE PRESENT</div>
+<div class="mono text-[15px] font-bold text-primary i-num">100% <span class="text-outline">→</span> 84%</div>
+<div class="mono text-[11px] text-acc-amber mt-1">−16 at night</div>
+</div>
+<div class="i-card i-accent red p-4 border border-outline-variant bg-surface-container-lowest cursor-default">
+<div class="text-[10px] text-outline uppercase tracking-wider mb-1 font-bold">TRAFFIC LIGHTS / FRAME</div>
+<div class="mono text-[15px] font-bold text-primary i-num">3.0 <span class="text-outline">→</span> 1.0</div>
+<div class="mono text-[11px] text-acc-red mt-1">−1.98 — weakest at night</div>
+</div>
+<div class="i-card i-accent p-4 border border-outline-variant bg-surface-container-lowest cursor-default">
+<div class="text-[10px] text-outline uppercase tracking-wider mb-1 font-bold">VEHICLES / FRAME</div>
+<div class="mono text-[15px] font-bold text-acc-green i-num">7.0 <span class="text-outline">→</span> 8.8</div>
+<div class="mono text-[11px] text-acc-green mt-1">holds up (head/tail-lights)</div>
+</div>
+<div class="i-card i-accent p-4 border border-outline-variant bg-surface-container-lowest cursor-default">
+<div class="text-[10px] text-outline uppercase tracking-wider mb-1 font-bold">MEAN CONFIDENCE</div>
+<div class="mono text-[15px] font-bold text-primary i-num">0.57 <span class="text-outline">→</span> 0.54</div>
+<div class="mono text-[11px] text-on-surface-variant mt-1">−0.03, small drop</div>
+</div>
+</div>
+</div>
+</section>
+
+<!-- MODEL STACK (honest) -->
+<section class="py-12 px-6 max-w-7xl mx-auto w-full border-t border-surface-variant" id="stack">
+<div class="mb-8">
+<div class="mono text-[11px] text-outline uppercase tracking-widest font-semibold">SEC. 06 // MODEL STACK</div>
+<h2 class="text-[26px] text-primary tracking-tight mt-0.5 font-semibold">Five Models — Three We Trained</h2>
+<p class="text-on-surface-variant text-[14px] mt-1 max-w-3xl">All TensorRT FP16, ~3M parameters each, running concurrently on a laptop RTX 3050 6GB. Three were trained for this project on real public datasets; two are pretrained backbones.</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+<!-- 1 ego_seg -->
+<div class="bg-surface-container-lowest border border-outline-variant p-5">
+<div class="w-10 h-10 border border-outline-variant bg-surface-container-low flex items-center justify-center text-acc-green mb-3"><span class="material-symbols-outlined text-[22px]">route</span></div>
+<div class="text-[10px] text-acc-green uppercase tracking-wider mb-1 font-bold">TRAINED · SEGMENTATION</div>
+<h3 class="text-[18px] text-primary font-bold mb-2">ego_seg — Ego-Lane</h3>
+<p class="text-on-surface-variant text-[13px] leading-relaxed">YOLOv8n-seg on 8k→28k real BDD100K ego-lane masks. Outputs the lane you're in, then lane-centre offset + LDW. Scaling data lifted mAP50-95 0.63→0.81.</p>
+<div class="mt-4 pt-3 border-t border-surface-variant mono text-[11px] flex items-center justify-between text-on-surface-variant">
+<span>BDD100K</span><span class="text-acc-green font-bold">mask mAP50 0.972</span></div>
+</div>
+<!-- 2 signs -->
+<div class="bg-surface-container-lowest border border-outline-variant p-5">
+<div class="w-10 h-10 border border-outline-variant bg-surface-container-low flex items-center justify-center text-acc-amber mb-3"><span class="material-symbols-outlined text-[22px]">signpost</span></div>
+<div class="text-[10px] text-acc-amber uppercase tracking-wider mb-1 font-bold">TRAINED · DETECTION</div>
+<h3 class="text-[18px] text-primary font-bold mb-2">signs — Traffic Signs</h3>
+<p class="text-on-surface-variant text-[13px] leading-relaxed">YOLOv8n on merged GTSDB + 7.5k Indian dashcam signs. 4 super-classes (prohibitory/mandatory/danger/other) — what shape+colour reliably support, no saturated name-classifier.</p>
+<div class="mt-4 pt-3 border-t border-surface-variant mono text-[11px] flex items-center justify-between text-on-surface-variant">
+<span>GTSDB + Indian</span><span class="text-acc-amber font-bold">mAP50 ~0.91</span></div>
+</div>
+<!-- 3 light_state -->
+<div class="bg-surface-container-lowest border border-outline-variant p-5">
+<div class="w-10 h-10 border border-outline-variant bg-surface-container-low flex items-center justify-center text-acc-red mb-3"><span class="material-symbols-outlined text-[22px]">traffic</span></div>
+<div class="text-[10px] text-acc-red uppercase tracking-wider mb-1 font-bold">TRAINED · DETECTION</div>
+<h3 class="text-[18px] text-primary font-bold mb-2">light_state — Signals</h3>
+<p class="text-on-surface-variant text-[13px] leading-relaxed">YOLOv8n on Bosch Small Traffic Lights — detects state directly (R/Y/G/OFF), replacing the pixel heuristic. Honest weak spots: yellow-sparse data + US-domain gap, mitigated by the temporal tracker.</p>
+<div class="mt-4 pt-3 border-t border-surface-variant mono text-[11px] flex items-center justify-between text-on-surface-variant">
+<span>Bosch</span><span class="text-acc-amber font-bold">mAP50 ~0.58</span></div>
+</div>
+<!-- 4 yolov8n -->
+<div class="bg-surface-container-lowest border border-outline-variant p-5">
+<div class="w-10 h-10 border border-outline-variant bg-surface-container-low flex items-center justify-center text-acc-blue mb-3"><span class="material-symbols-outlined text-[22px]">directions_car</span></div>
+<div class="text-[10px] text-outline uppercase tracking-wider mb-1 font-bold">PRETRAINED · DETECTION</div>
+<h3 class="text-[18px] text-primary font-bold mb-2">yolov8n — Vehicles</h3>
+<p class="text-on-surface-variant text-[13px] leading-relaxed">COCO YOLOv8n: car/motorcycle/bus/truck, plus traffic-light candidate boxes as a fallback for the tracker. Re-exported FP16 (166→86 MB) — that alone lifted the pipeline from ~13 to ~23 FPS.</p>
+<div class="mt-4 pt-3 border-t border-surface-variant mono text-[11px] flex items-center justify-between text-on-surface-variant">
+<span>COCO</span><span class="text-acc-blue font-bold">FP16 · 16 ms</span></div>
+</div>
+<!-- 5 yolop -->
+<div class="bg-surface-container-lowest border border-outline-variant p-5">
+<div class="w-10 h-10 border border-outline-variant bg-surface-container-low flex items-center justify-center text-primary mb-3"><span class="material-symbols-outlined text-[22px]">grid_on</span></div>
+<div class="text-[10px] text-outline uppercase tracking-wider mb-1 font-bold">PRETRAINED · SEGMENTATION</div>
+<h3 class="text-[18px] text-primary font-bold mb-2">yolop — Drivable + Lane px</h3>
+<p class="text-on-surface-variant text-[13px] leading-relaxed">YOLOP (hustvl) via torch.hub — only its two segmentation heads exported. Drivable-area mask + lane-line pixels that refine the ego-lane mask as a secondary cue.</p>
+<div class="mt-4 pt-3 border-t border-surface-variant mono text-[11px] flex items-center justify-between text-on-surface-variant">
+<span>BDD100K</span><span class="text-primary font-bold">2 seg heads</span></div>
+</div>
+<!-- data summary -->
+<div class="bg-surface border border-outline-variant p-5 flex flex-col justify-center">
+<div class="text-[10px] text-outline uppercase tracking-wider mb-2 font-bold">DATASETS (ALL REAL)</div>
+<div class="mono text-[11px] space-y-1.5 text-on-surface-variant">
+<div>• BDD100K — ego-lane masks (US/varied)</div>
+<div>• GTSDB — German sign photos</div>
+<div>• Indian dashcam — 7.5k sign images</div>
+<div>• Bosch — traffic-light states</div>
+<div>• Validated on Kolkata / Mumbai / NH-44</div>
+</div>
+</div>
+</div>
+</section>
+
+<!-- DATASETS (detail) -->
+<section class="py-12 px-6 max-w-7xl mx-auto w-full border-t border-surface-variant" id="data">
+<div class="mb-6">
+<div class="mono text-[11px] text-outline uppercase tracking-widest font-semibold">SEC. 07 // TRAINING DATA</div>
+<h2 class="text-[26px] text-primary tracking-tight mt-0.5 font-semibold">The Datasets — Real Photographs, Real Splits</h2>
+<p class="text-on-surface-variant text-[14px] mt-1 max-w-3xl">Every model we trained used real, publicly sourced imagery — no synthetic paste-ups. Exact splits and per-class box counts below; class imbalance is shown, not hidden.</p>
+</div>
+<div class="overflow-x-auto bg-surface-container-lowest border border-outline-variant shadow-sm mb-6">
+<table class="w-full text-left text-[12px] mono">
+<thead class="bg-surface-container-low border-b border-surface-variant text-outline uppercase text-[10px] tracking-wider">
+<tr><th class="p-3">Model</th><th class="p-3">Dataset</th><th class="p-3">Source</th><th class="p-3">Train / Val</th><th class="p-3">Notes</th></tr>
+</thead>
+<tbody class="divide-y divide-surface-variant">
+<tr class="hover:bg-surface-container-low"><td class="p-3 font-semibold text-acc-green">ego_seg</td><td class="p-3">BDD100K drivable masks</td><td class="p-3">nguyentrongquocdat (Kaggle)</td><td class="p-3">~28,000 / 2,000</td><td class="p-3 text-on-surface-variant">"direct drivable" = ego lane; US/varied</td></tr>
+<tr class="hover:bg-surface-container-low"><td class="p-3 font-semibold text-acc-amber">signs</td><td class="p-3">GTSDB + Indian dashcam</td><td class="p-3">sovitrath + akbaralibatti (Kaggle)</td><td class="p-3">6,853 / 1,207</td><td class="p-3 text-on-surface-variant">merged, mapped to 4 super-classes</td></tr>
+<tr class="hover:bg-surface-container-low"><td class="p-3 font-semibold text-acc-red">light_state</td><td class="p-3">Bosch Small Traffic Lights</td><td class="p-3">xingtingzhao (Kaggle)</td><td class="p-3">8,606 / 1,509</td><td class="p-3 text-on-surface-variant">native R/Y/G/OFF; re-split 85/15</td></tr>
+<tr class="hover:bg-surface-container-low"><td class="p-3 font-semibold">yolov8n</td><td class="p-3">COCO</td><td class="p-3">Ultralytics (pretrained)</td><td class="p-3">—</td><td class="p-3 text-on-surface-variant">vehicles + light candidates</td></tr>
+<tr class="hover:bg-surface-container-low"><td class="p-3 font-semibold">yolop</td><td class="p-3">BDD100K</td><td class="p-3">hustvl/YOLOP (pretrained)</td><td class="p-3">—</td><td class="p-3 text-on-surface-variant">drivable + lane-pixel seg heads</td></tr>
+</tbody>
+</table>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- sign class balance -->
+<div class="bg-surface-container-lowest border border-outline-variant p-5">
+<div class="mono text-[11px] text-outline uppercase tracking-wider font-bold mb-3">SIGN BOXES PER SUPER-CLASS (merged)</div>
+<div class="space-y-2 mono text-[12px]">
+<div><div class="flex justify-between mb-0.5"><span class="text-acc-amber font-semibold">danger</span><span>4,205</span></div><div class="h-1.5 bg-surface-variant"><div class="h-full bg-acc-amber" style="width:100%"></div></div></div>
+<div><div class="flex justify-between mb-0.5"><span class="font-semibold">other</span><span>4,144</span></div><div class="h-1.5 bg-surface-variant"><div class="h-full bg-on-surface-variant" style="width:98%"></div></div></div>
+<div><div class="flex justify-between mb-0.5"><span class="text-acc-red font-semibold">prohibitory</span><span>396</span></div><div class="h-1.5 bg-surface-variant"><div class="h-full bg-acc-red" style="width:9%"></div></div></div>
+<div><div class="flex justify-between mb-0.5"><span class="text-acc-blue font-semibold">mandatory</span><span>114</span></div><div class="h-1.5 bg-surface-variant"><div class="h-full bg-acc-blue" style="width:3%"></div></div></div>
+</div>
+<p class="text-[11px] text-on-surface-variant mt-3 leading-relaxed">Indian data is warning-heavy → danger/other strong, prohibitory/mandatory weak. This is the honest reason a triangular warning sometimes reads as "other".</p>
+</div>
+<!-- light class balance -->
+<div class="bg-surface-container-lowest border border-outline-variant p-5">
+<div class="mono text-[11px] text-outline uppercase tracking-wider font-bold mb-3">LIGHT BOXES PER STATE (Bosch)</div>
+<div class="space-y-2 mono text-[12px]">
+<div><div class="flex justify-between mb-0.5"><span class="text-acc-green font-semibold">green</span><span>12,722</span></div><div class="h-1.5 bg-surface-variant"><div class="h-full bg-acc-green" style="width:100%"></div></div></div>
+<div><div class="flex justify-between mb-0.5"><span class="text-acc-red font-semibold">red</span><span>9,211</span></div><div class="h-1.5 bg-surface-variant"><div class="h-full bg-acc-red" style="width:72%"></div></div></div>
+<div><div class="flex justify-between mb-0.5"><span class="font-semibold">off</span><span>1,081</span></div><div class="h-1.5 bg-surface-variant"><div class="h-full bg-on-surface-variant" style="width:8%"></div></div></div>
+<div><div class="flex justify-between mb-0.5"><span class="text-acc-amber font-semibold">yellow</span><span>561</span></div><div class="h-1.5 bg-surface-variant"><div class="h-full bg-acc-amber" style="width:4%"></div></div></div>
+</div>
+<p class="text-[11px] text-on-surface-variant mt-3 leading-relaxed">Yellow is severely under-represented (561 vs 12,722 green) — the main reason light mAP50 caps at ~0.58. Named plainly.</p>
+</div>
+</div>
+</section>
+
+<!-- DESIGN DECISIONS (why not X) -->
+<section class="py-12 px-6 max-w-7xl mx-auto w-full border-t border-surface-variant" id="decisions">
+<div class="mb-6">
+<div class="mono text-[11px] text-outline uppercase tracking-widest font-semibold">SEC. 08 // DESIGN DECISIONS</div>
+<h2 class="text-[26px] text-primary tracking-tight mt-0.5 font-semibold">What We Rejected — and the Measured Reason Why</h2>
+<p class="text-on-surface-variant text-[14px] mt-1 max-w-3xl">The choices that matter for a technical review. Every alternative below was actually tried or seriously evaluated, and rejected on evidence — not opinion.</p>
+</div>
+<div class="overflow-x-auto bg-surface-container-lowest border border-outline-variant shadow-sm">
+<table class="w-full text-left text-[12px] mono">
+<thead class="bg-surface-container-low border-b border-surface-variant text-outline uppercase text-[10px] tracking-wider">
+<tr><th class="p-3">Task</th><th class="p-3">Alternative tried</th><th class="p-3">Measured result</th><th class="p-3">Verdict</th></tr>
+</thead>
+<tbody class="divide-y divide-surface-variant">
+<tr class="hover:bg-surface-container-low"><td class="p-3 font-semibold">Ego-lane</td><td class="p-3">OpenCV heuristic corridor</td><td class="p-3">IoU 0.06, finds lane 4% of frames</td><td class="p-3 text-acc-red font-bold">Rejected</td></tr>
+<tr class="hover:bg-surface-container-low"><td class="p-3 font-semibold">Ego-lane</td><td class="p-3">UFLD (off-the-shelf, CULane)</td><td class="p-3">Placed lanes in the sky — camera-geometry domain gap</td><td class="p-3 text-acc-red font-bold">Rejected</td></tr>
+<tr class="hover:bg-surface-container-low"><td class="p-3 font-semibold">Ego-lane</td><td class="p-3">IDD Indian lane model</td><td class="p-3">mask mAP50 0.14 (label-mapping issue)</td><td class="p-3 text-acc-red font-bold">Kept out; BDD default</td></tr>
+<tr class="bg-acc-green/5"><td class="p-3 font-semibold">Ego-lane</td><td class="p-3 text-acc-green font-bold">YOLOv8n-seg on BDD masks</td><td class="p-3">mask mAP50 0.972</td><td class="p-3 text-acc-green font-bold">✓ Adopted</td></tr>
+<tr class="hover:bg-surface-container-low"><td class="p-3 font-semibold">Signs</td><td class="p-3">GTSRB 43-class classifier (2-stage)</td><td class="p-3">96.8% but SATURATED — conf 1.00 on unseen signs</td><td class="p-3 text-acc-red font-bold">Rejected</td></tr>
+<tr class="hover:bg-surface-container-low"><td class="p-3 font-semibold">Signs</td><td class="p-3">Detector on synthetic paste-ups</td><td class="p-3">99.3% synthetic, ~57% real presence</td><td class="p-3 text-acc-red font-bold">Rejected</td></tr>
+<tr class="bg-acc-amber/5"><td class="p-3 font-semibold">Signs</td><td class="p-3 text-acc-amber font-bold">Single-stage, 4 super-classes, real data</td><td class="p-3">mAP50 ~0.91 held-out</td><td class="p-3 text-acc-green font-bold">✓ Adopted</td></tr>
+<tr class="hover:bg-surface-container-low"><td class="p-3 font-semibold">Lights</td><td class="p-3">BDD-YOLO light set</td><td class="p-3">Collapses colour → single class, loses state</td><td class="p-3 text-acc-red font-bold">Rejected</td></tr>
+<tr class="bg-acc-red/5"><td class="p-3 font-semibold">Lights</td><td class="p-3 text-acc-red font-bold">Bosch (native R/Y/G/OFF)</td><td class="p-3">mAP50 ~0.58 + temporal tracker</td><td class="p-3 text-acc-green font-bold">✓ Adopted</td></tr>
+</tbody>
+</table>
+</div>
+<p class="mono text-[11px] text-on-surface-variant mt-3 max-w-3xl">The thesis in one row: <b>UFLD</b>, a strong published lane model, was useless on our camera geometry — which is exactly why we <b>trained on real target-domain data</b>. And a classifier that <b>can't tell you it's uncertain</b> (GTSRB at conf 1.00 on unseen signs) is worse than a coarser model that's honest.</p>
+</section>
+
+<!-- PERFORMANCE & TECH STACK -->
+<section class="py-12 px-6 max-w-7xl mx-auto w-full border-t border-surface-variant" id="perf">
+<div class="mb-6">
+<div class="mono text-[11px] text-outline uppercase tracking-widest font-semibold">SEC. 09 // PERFORMANCE &amp; TECH STACK</div>
+<h2 class="text-[26px] text-primary tracking-tight mt-0.5 font-semibold">Five Networks in 6 GB, Compiled to FP16</h2>
+<p class="text-on-surface-variant text-[14px] mt-1 max-w-3xl">Measured per-model inference cost on the laptop RTX 3050, and the stack that runs it. Frame-skipping turns these into 16 FPS (accurate) / 23 FPS (fast).</p>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+<!-- per-model ms -->
+<div class="bg-surface-container-lowest border border-outline-variant p-5">
+<div class="mono text-[11px] text-outline uppercase tracking-wider font-bold mb-3">INFERENCE COST (TensorRT FP16, ms/call)</div>
+<div class="space-y-2 mono text-[12px]">
+<div><div class="flex justify-between mb-0.5"><span>YOLOP</span><span class="font-bold">24 ms</span></div><div class="h-1.5 bg-surface-variant"><div class="h-full bg-primary" style="width:100%"></div></div></div>
+<div><div class="flex justify-between mb-0.5"><span class="text-acc-green">ego_seg</span><span class="font-bold">19 ms</span></div><div class="h-1.5 bg-surface-variant"><div class="h-full bg-acc-green" style="width:79%"></div></div></div>
+<div><div class="flex justify-between mb-0.5"><span class="text-acc-blue">yolov8n</span><span class="font-bold">16 ms</span></div><div class="h-1.5 bg-surface-variant"><div class="h-full bg-acc-blue" style="width:67%"></div></div></div>
+<div><div class="flex justify-between mb-0.5"><span class="text-acc-red">light_state</span><span class="font-bold">15 ms</span></div><div class="h-1.5 bg-surface-variant"><div class="h-full bg-acc-red" style="width:63%"></div></div></div>
+<div><div class="flex justify-between mb-0.5"><span class="text-acc-amber">signs</span><span class="font-bold">14 ms</span></div><div class="h-1.5 bg-surface-variant"><div class="h-full bg-acc-amber" style="width:58%"></div></div></div>
+</div>
+<div class="mt-4 pt-3 border-t border-surface-variant text-[11px] text-on-surface-variant leading-relaxed">
+<b>Optimisation caught:</b> yolov8n was accidentally exported FP32 (166 MB, 73 ms) — the pipeline's real bottleneck. Re-exporting FP16 (86 MB, 16 ms) lifted the live rate from ~13 → ~23 FPS.
+</div>
+</div>
+<!-- tech stack -->
+<div class="bg-surface-container-lowest border border-outline-variant p-5">
+<div class="mono text-[11px] text-outline uppercase tracking-wider font-bold mb-3">TECHNOLOGY STACK</div>
+<div class="mono text-[12px] divide-y divide-surface-variant">
+<div class="flex justify-between py-1.5"><span class="text-on-surface-variant">Models</span><span class="font-semibold text-right">Ultralytics YOLOv8 / v8-seg · YOLOP</span></div>
+<div class="flex justify-between py-1.5"><span class="text-on-surface-variant">Training</span><span class="font-semibold text-right">PyTorch 2.x (CUDA 12.6)</span></div>
+<div class="flex justify-between py-1.5"><span class="text-on-surface-variant">Inference</span><span class="font-semibold text-right">TensorRT 11.2 FP16 · ONNX</span></div>
+<div class="flex justify-between py-1.5"><span class="text-on-surface-variant">Classical CV</span><span class="font-semibold text-right">OpenCV (gate, voting, smoothing)</span></div>
+<div class="flex justify-between py-1.5"><span class="text-on-surface-variant">Backend</span><span class="font-semibold text-right">FastAPI + Uvicorn · MJPEG stream</span></div>
+<div class="flex justify-between py-1.5"><span class="text-on-surface-variant">Frontend</span><span class="font-semibold text-right">HTML + Tailwind + vanilla JS</span></div>
+<div class="flex justify-between py-1.5"><span class="text-on-surface-variant">Trained on</span><span class="font-semibold text-right">Kaggle 2×T4 + Colab T4 (parallel)</span></div>
+</div>
+<div class="mt-4 pt-3 border-t border-surface-variant text-[11px] text-on-surface-variant leading-relaxed">
+Cloud training's value was <b>parallelism</b>, not speed (T4 ≈ RTX 3050 compute). Final engines compiled <b>locally</b> — a TRT engine is bound to its exact GPU + driver.
+</div>
+</div>
+</div>
+</section>
+
+<!-- LIMITATIONS & ROADMAP -->
+<section class="py-12 px-6 max-w-7xl mx-auto w-full border-t border-surface-variant" id="next">
+<div class="mb-6">
+<div class="mono text-[11px] text-outline uppercase tracking-widest font-semibold">SEC. 10 // LIMITATIONS &amp; ROADMAP</div>
+<h2 class="text-[26px] text-primary tracking-tight mt-0.5 font-semibold">What's Weak, and What We'd Build Next</h2>
+<p class="text-on-surface-variant text-[14px] mt-1 max-w-3xl">Stated plainly — a system's honesty about its own limits is part of the engineering.</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<div class="bg-surface-container-lowest border border-outline-variant p-5">
+<div class="mono text-[11px] text-acc-red uppercase tracking-wider font-bold mb-3">KNOWN LIMITATIONS</div>
+<ul class="text-[13px] text-on-surface-variant space-y-2 leading-relaxed">
+<li>• <b>Signs:</b> localisation solid, but danger↔other confusion; mandatory/prohibitory weak (data imbalance).</li>
+<li>• <b>Lights:</b> low-confidence on Indian signals (Bosch domain gap); yellow the weakest class.</li>
+<li>• <b>Ego-lane:</b> BDD-trained; Indian IDD variant scored only 0.14, so BDD stays default. Severe occlusion is the weak case.</li>
+<li>• <b>Night:</b> traffic-light recall drops to ~⅓ of daytime — known field failure mode.</li>
+<li>• <b>Light association</b> is grid-cell, not IoU — two very close lights can merge.</li>
+<li>• <b>1080p is CPU-bound</b> (decode dominates); 720p is the sweet spot.</li>
+</ul>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant p-5">
+<div class="mono text-[11px] text-acc-green uppercase tracking-wider font-bold mb-3">ROADMAP (PRIORITISED)</div>
+<ol class="text-[13px] text-on-surface-variant space-y-2 leading-relaxed">
+<li><b>1.</b> Indian-signal traffic-light fine-tune — biggest lever: raises confidence, tightens the gate, fixes night.</li>
+<li><b>2.</b> Rebalance the sign dataset — add Indian prohibitory/mandatory to fix danger↔other.</li>
+<li><b>3.</b> Fix or drop ego_seg_idd — diagnose the IDD label mapping so an Indian lane model can beat BDD.</li>
+<li><b>4.</b> IoU-based light tracking — replace grid-cell association.</li>
+</ol>
+</div>
+</div>
+</section>
+
+<footer class="bg-surface-container-low border-t border-outline-variant/60 mt-auto">
+<div class="max-w-7xl mx-auto w-full px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-3 mono text-[11px] text-on-surface-variant">
+<span>CarLaneI — edge driving perception. All metrics measured on held-out data / the live run. No fabricated figures.</span>
+<span class="flex items-center gap-3">
+<span class="px-2 py-1 bg-surface-container-lowest border border-outline-variant">BDD100K</span>
+<span class="px-2 py-1 bg-surface-container-lowest border border-outline-variant">GTSDB</span>
+<span class="px-2 py-1 bg-surface-container-lowest border border-outline-variant">TensorRT FP16</span>
+</span>
+</div>
+</footer>
+
+<div id="toasts"></div>
+<script src="app.js?v=7"></script>
+</body></html>

@@ -1,0 +1,15 @@
+{
+  "id": "matrixmj/carlane-ego-seg-idd-train",
+  "title": "carlane-ego-seg-idd-train",
+  "code_file": "train_ego_seg_idd_kaggle.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": true,
+  "dataset_sources": ["redzapdos123/indian-driving-dataset-segmentations-yolov11-seg"],
+  "competition_sources": [],
+  "kernel_sources": [],
+  "model_sources": []
+}

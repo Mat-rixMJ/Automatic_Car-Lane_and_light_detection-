@@ -30,7 +30,18 @@ def validate(video_path, seconds, save_samples=True):
     from ultralytics import YOLO
     yolop = TRTSeg(MODELS_DIR / f"yolop_{YOLOP_SZ}.engine", imgsz=YOLOP_SZ)
     yolov8 = YOLO(str(MODELS_DIR / "yolov8n.engine"), task="detect")
-    signdet = YOLO(str(MODELS_DIR / "german_sign_detector.engine"), task="detect")
+
+    # Sign detector is optional — don't crash the whole validation if it's not
+    # built. Prefer the TensorRT engine, fall back to the .pt, else skip signs.
+    signdet = None
+    _sign_engine = MODELS_DIR / "german_sign_detector.engine"
+    _sign_pt = MODELS_DIR / "german_sign_detector.pt"
+    if _sign_engine.exists():
+        signdet = YOLO(str(_sign_engine), task="detect")
+    elif _sign_pt.exists():
+        signdet = YOLO(str(_sign_pt))
+    else:
+        print("  (sign detector not found — sign metrics will be skipped)")
 
     cap = cv2.VideoCapture(str(video_path))
     fps = cap.get(cv2.CAP_PROP_FPS) or 30
@@ -113,17 +124,18 @@ def validate(video_path, seconds, save_samples=True):
         if got_tl:
             frames_with["traffic_light"] += 1
 
-        # --- Signs ---
-        got_sign = False
-        for r in signdet(proc, conf=0.25, verbose=False, imgsz=480):
-            for box in r.boxes:
-                cid = int(box.cls[0])
-                sign_classes[{0: "prohibitory", 1: "mandatory",
-                              2: "danger", 3: "other"}.get(cid, "sign")] += 1
-                got_sign = True
-                n_det += 1
-        if got_sign:
-            frames_with["sign"] += 1
+        # --- Signs --- (native frame at 640 to match training; optional)
+        if signdet is not None:
+            got_sign = False
+            for r in signdet(frame, conf=0.35, verbose=False, imgsz=640):
+                for box in r.boxes:
+                    cid = int(box.cls[0])
+                    sign_classes[{0: "prohibitory", 1: "mandatory",
+                                  2: "danger", 3: "other"}.get(cid, "sign")] += 1
+                    got_sign = True
+                    n_det += 1
+            if got_sign:
+                frames_with["sign"] += 1
 
         best.append((n_det, idx, frame if save_samples and len(best) < 400 else None))
 

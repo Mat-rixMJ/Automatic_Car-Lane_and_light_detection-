@@ -14,8 +14,9 @@ CARLA_*/
 venv/
 env/
 
-# --- Datasets (5 GB + 1.6 GB) ---
+# --- Datasets (5 GB + 1.6 GB + 6.9 GB) ---
 BDDA/
+BDD100K/
 data/
 *.torrent
 
@@ -71,3 +72,4 @@ desktop.ini
 
 # --- Local machine notes ---
 global_backup_freeze.txt
+.commit_msg.txt

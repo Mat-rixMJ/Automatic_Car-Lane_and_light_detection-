@@ -36,8 +36,17 @@ class TrafficLightTracker:
 
     # --- filtering --------------------------------------------------------
 
-    def accept(self, x1, y1, x2, y2, conf):
-        """Geometry gate. Returns False for things that can't be a traffic light."""
+    # A learned state-detector already knows shape+colour, so its boxes only
+    # need to clear a lower conf floor; the pixel-heuristic path keeps MIN_CONF.
+    STATED_MIN_CONF = 0.12
+
+    def accept(self, x1, y1, x2, y2, conf, min_conf=None):
+        """Geometry gate. Returns False for things that can't be a traffic light.
+
+        min_conf: override the confidence floor (used by the learned-state path,
+        whose detector scores Indian signals well below the heuristic's 0.20).
+        The geometry gates are unchanged — a light is a light regardless of source.
+        """
         bh, bw = y2 - y1, x2 - x1
         if bh < self.MIN_H or bw <= 0:
             return False
@@ -46,7 +55,7 @@ class TrafficLightTracker:
         # The single biggest false-positive source: detections below the horizon.
         if y1 > self.h * self.MAX_Y_FRAC:
             return False
-        if conf < self.MIN_CONF:
+        if conf < (self.MIN_CONF if min_conf is None else min_conf):
             return False
         return True
 
@@ -128,6 +137,61 @@ class TrafficLightTracker:
         # Drop expired, and never surface a track seen only once (ghost)
         self.tracks = {k: v for k, v in self.tracks.items() if v["ttl"] > 0}
 
+        out = []
+        for tr in self.tracks.values():
+            if tr["seen"] < 2 or tr["state"] is None:
+                continue
+            x1, y1, x2, y2 = tr["box"]
+            out.append((x1, y1, x2, y2, tr["state"], tr["conf"]))
+        return out
+
+    def update_stated(self, detections, frame=None):
+        """Like update(), but each detection ALREADY carries a learned state
+        (from a trained light-state detector): (x1, y1, x2, y2, state, conf),
+        state in {'RED','GREEN','YELLOW','OFF'}. We skip the pixel-colour guess
+        and feed the detector's state straight into the SAME temporal voting so
+        colour still can't flip frame-to-frame. `frame` is unused here (kept for
+        a symmetric signature).
+
+        Returns list of (x1, y1, x2, y2, state, conf) for display.
+        """
+        for tr in self.tracks.values():
+            tr["ttl"] -= 1
+
+        for det in detections:
+            x1, y1, x2, y2, reading, conf = det
+            # geometry gate still applies (rejects sub-horizon / too-small boxes);
+            # conf floor is the lower learned-path value, not the heuristic 0.20.
+            if not self.accept(x1, y1, x2, y2, conf, min_conf=self.STATED_MIN_CONF):
+                continue
+            if reading == "OFF":
+                reading = None   # 'off' is a real class but not a signal to hold
+            cell = (x1 // self.CELL, y1 // self.CELL)
+            tr = self.tracks.get(cell)
+            if tr is None:
+                self.tracks[cell] = {"state": reading, "pending": None,
+                                     "pending_n": 0, "ttl": self.TTL,
+                                     "box": (x1, y1, x2, y2), "conf": conf, "seen": 1}
+                continue
+            tr["box"] = (x1, y1, x2, y2)
+            tr["conf"] = conf
+            tr["ttl"] = self.TTL
+            tr["seen"] += 1
+            if reading is None:
+                continue
+            if tr["state"] is None or reading == tr["state"]:
+                tr["state"] = reading
+                tr["pending"], tr["pending_n"] = None, 0
+            else:
+                if reading == tr["pending"]:
+                    tr["pending_n"] += 1
+                else:
+                    tr["pending"], tr["pending_n"] = reading, 1
+                if tr["pending_n"] >= self.VOTES_TO_SWITCH:
+                    tr["state"] = reading
+                    tr["pending"], tr["pending_n"] = None, 0
+
+        self.tracks = {k: v for k, v in self.tracks.items() if v["ttl"] > 0}
         out = []
         for tr in self.tracks.values():
             if tr["seen"] < 2 or tr["state"] is None:

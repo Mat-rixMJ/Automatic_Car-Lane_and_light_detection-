@@ -77,8 +77,10 @@ if __name__ == "__main__":
     # than 480 on a 512p downscale (median light is 34px native, 13px downscaled).
     export_model(MODELS_DIR / "yolov8n.pt", imgsz=640, name="YOLOv8n COCO (vehicles+lights)")
     
-    # Export German sign detector
-    export_model(MODELS_DIR / "german_sign_detector.pt", imgsz=480, name="German Sign Detector")
+    # Export German sign detector. 640 to match how it was TRAINED
+    # (train_sign_detector.py imgsz=640) — GTSDB signs are small in 1360x800
+    # frames, and export imgsz must match train imgsz or accuracy drops.
+    export_model(MODELS_DIR / "german_sign_detector.pt", imgsz=640, name="German Sign Detector")
     
     print("\n\n✓ All models exported to TensorRT (.engine)")
     print("  Pipeline will auto-detect .engine files and use them.")
