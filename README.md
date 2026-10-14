@@ -12,14 +12,17 @@
 
 ---
 
-## Example output (annotated frame from a live run)
+## Example output (annotated frames from a live run)
 
-![CarLaneI annotated output — ego-lane fill, lane border, vehicle boxes, HUD](docs/images/demo_2.png)
+![CarLaneI annotated output — ego-lane fill, lane border, vehicle boxes, HUD, 23 FPS](docs/images/demo_mumbai_2.png)
 
-*Real frame from the Kolkata clip: the green region is the detected **ego lane**
-(the lane the car is in), the yellow line is its border, blue boxes are **vehicles**
-with confidence, cyan is raw lane-marking pixels, and the top strip is the live HUD
-(FPS, vehicle/light/sign counts). Everything is drawn by the pipeline at runtime.*
+*Real frame from the Mumbai clip (via `run.bat`, live mode at 23 FPS): the green
+region is the detected **ego lane** (the lane the car is in), the yellow line is its
+border, blue boxes are **vehicles** with class + confidence (truck/car), cyan is raw
+lane-marking pixels, and the top strip is the live HUD (FPS, vehicle/light/sign
+counts). Everything is drawn by the pipeline at runtime.*
+
+![CarLaneI annotated output — second frame](docs/images/demo_mumbai_1.png)
 
 ---
 

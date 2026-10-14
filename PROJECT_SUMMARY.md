@@ -23,10 +23,11 @@ laptop GPU.
 
 ## Example output
 
-![Annotated output: ego-lane fill, vehicle detections, HUD](docs/images/demo_2.png)
+![Annotated output: ego-lane fill, vehicle detections, HUD, 23 FPS](docs/images/demo_mumbai_2.png)
 
-*A real annotated frame — green = detected ego lane, yellow = lane border, blue =
-vehicle detections with confidence, top strip = live HUD. All drawn in real time.*
+*A real annotated frame (Mumbai clip, live at 23 FPS) — green = detected ego lane,
+yellow = lane border, blue = vehicle detections (truck/car) with confidence, top
+strip = live HUD. All drawn in real time by the pipeline.*
 
 ---
 
