@@ -5,7 +5,7 @@
 > live at **~23 FPS on 720p** on a single laptop **RTX 3050 (6 GB)**, all models
 > compiled to **TensorRT FP16**.
 >
-> This document is written to be read by engineers. Every accuracy number is a
+> Every accuracy number is a
 > **measured** value from a held-out validation set or an instrumented run on
 > real footage; nothing is estimated or rounded up for effect. Where a component
 > is weak, this document says so and explains why.
