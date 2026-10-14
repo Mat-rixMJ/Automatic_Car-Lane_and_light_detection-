@@ -12,6 +12,17 @@
 
 ---
 
+## Example output (annotated frame from a live run)
+
+![CarLaneI annotated output — ego-lane fill, lane border, vehicle boxes, HUD](docs/images/demo_2.png)
+
+*Real frame from the Kolkata clip: the green region is the detected **ego lane**
+(the lane the car is in), the yellow line is its border, blue boxes are **vehicles**
+with confidence, cyan is raw lane-marking pixels, and the top strip is the live HUD
+(FPS, vehicle/light/sign counts). Everything is drawn by the pipeline at runtime.*
+
+---
+
 ## Slide 1 — The one-paragraph pitch
 
 Off-the-shelf driving-perception models are trained on US/European roads (BDD100K,
